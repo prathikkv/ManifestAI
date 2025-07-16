@@ -1,0 +1,66 @@
+import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
+
+const isPublicRoute = createRouteMatcher([
+  '/',
+  '/sign-in(.*)',
+  '/sign-up(.*)',
+  '/about',
+  '/features',
+  '/pricing',
+  '/contact',
+  '/privacy',
+  '/terms',
+  '/api/webhook(.*)',
+  '/api/health',
+]);
+
+const isOnboardingRoute = createRouteMatcher(['/onboarding(.*)']);
+
+export default clerkMiddleware(async (auth, req) => {
+  // Allow public routes
+  if (isPublicRoute(req)) {
+    return;
+  }
+
+  // Protect all other routes
+  const { userId, redirectToSignIn } = await auth();
+
+  if (!userId) {
+    return redirectToSignIn();
+  }
+
+  // Handle onboarding flow
+  if (isOnboardingRoute(req)) {
+    return;
+  }
+
+  // Check if user has completed onboarding
+  try {
+    const { clerkClient } = await import('@clerk/nextjs/server');
+    const user = await clerkClient.users.getUser(userId);
+    
+    const hasCompletedOnboarding = user.publicMetadata.onboardingCompleted as boolean;
+    const hasAcceptedTerms = user.publicMetadata.termsAccepted as boolean;
+    const hasGivenConsent = user.publicMetadata.privacyConsent as boolean;
+
+    // Redirect to onboarding if not completed
+    if (!hasCompletedOnboarding || !hasAcceptedTerms || !hasGivenConsent) {
+      const onboardingUrl = new URL('/onboarding', req.url);
+      return Response.redirect(onboardingUrl);
+    }
+  } catch (error) {
+    console.error('Error checking onboarding status:', error);
+    // On error, redirect to onboarding to be safe
+    const onboardingUrl = new URL('/onboarding', req.url);
+    return Response.redirect(onboardingUrl);
+  }
+});
+
+export const config = {
+  matcher: [
+    // Skip Next.js internals and all static files
+    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+    // Always run for API routes
+    '/(api|trpc)(.*)',
+  ],
+};

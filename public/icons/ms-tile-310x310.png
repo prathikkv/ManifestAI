@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="310" height="310" viewBox="0 0 310 310">
+  <defs>
+    <linearGradient id="manifestGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3B82F6"/>
+      <stop offset="50%" style="stop-color:#8B5CF6"/>
+      <stop offset="100%" style="stop-color:#EC4899"/>
+    </linearGradient>
+  </defs>
+  <rect width="310" height="310" rx="62" fill="url(#manifestGrad)"/>
+  <circle cx="155" cy="155" r="93" fill="rgba(255,255,255,0.1)"/>
+  <g transform="translate(155,155)">
+    <path d="M-46.5,-31 L-46.5,46.5 L-15.5,46.5 L-15.5,15.5 L15.5,46.5 L46.5,15.5 L46.5,46.5 L77.5,46.5 L77.5,-31 L46.5,-31 L15.5,15.5 L-15.5,-31 Z" fill="white" opacity="0.95"/>
+  </g>
+</svg>

@@ -1,0 +1,40 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="manifestGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3B82F6;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#8B5CF6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#EC4899;stop-opacity:1" />
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+      <feMerge> 
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Background Circle -->
+  <circle cx="256" cy="256" r="240" fill="url(#manifestGradient)" filter="url(#glow)"/>
+  
+  <!-- Inner Circle -->
+  <circle cx="256" cy="256" r="180" fill="rgba(255,255,255,0.1)" stroke="rgba(255,255,255,0.3)" stroke-width="2"/>
+  
+  <!-- Center Symbol - Stylized M -->
+  <g transform="translate(256,256)">
+    <!-- M Letter -->
+    <path d="M-60,-40 L-60,40 L-40,40 L-40,-10 L0,30 L40,-10 L40,40 L60,40 L60,-40 L40,-40 L0,0 L-40,-40 Z" 
+          fill="white" opacity="0.95"/>
+    
+    <!-- Sparkle effects -->
+    <g opacity="0.8">
+      <path d="M-80,-60 L-75,-50 L-70,-60 L-75,-70 Z" fill="white"/>
+      <path d="M80,60 L85,70 L90,60 L85,50 Z" fill="white"/>
+      <path d="M-70,70 L-65,75 L-60,70 L-65,65 Z" fill="white"/>
+      <path d="M70,-70 L75,-65 L80,-70 L75,-75 Z" fill="white"/>
+    </g>
+  </g>
+  
+  <!-- Outer ring with subtle animation -->
+  <circle cx="256" cy="256" r="230" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="3" stroke-dasharray="10,5"/>
+</svg>

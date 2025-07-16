@@ -1,0 +1,400 @@
+// Prisma Schema for ManifestAI Platform
+// Designed with privacy-by-design principles and GDPR compliance
+
+generator client {
+  provider = "prisma-client-js"
+  previewFeatures = ["jsonProtocol"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User Model - Core identity with privacy considerations
+model User {
+  id                String    @id @default(cuid())
+  clerkId           String    @unique
+  email             String    @unique
+  username          String?   @unique
+  
+  // Privacy & Consent
+  privacySettings   Json      @default("{}")
+  consentHistory    Consent[]
+  dataExportLogs    DataExportLog[]
+  deletionRequests  DeletionRequest[]
+  
+  // Profile
+  profile           Profile?
+  
+  // Features
+  dreams            Dream[]
+  visionBoards      VisionBoard[]
+  journalEntries    JournalEntry[]
+  habits            Habit[]
+  affirmations      Affirmation[]
+  milestones        Milestone[]
+  
+  // AI & Analytics (anonymized)
+  aiConversations   AIConversation[]
+  analytics         UserAnalytics?
+  
+  // Timestamps
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  lastActiveAt      DateTime  @default(now())
+  
+  @@index([clerkId])
+  @@index([email])
+}
+
+// Profile - Separated for selective sharing
+model Profile {
+  id                String    @id @default(cuid())
+  userId            String    @unique
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Basic Info
+  displayName       String?
+  bio               String?
+  avatarUrl         String?
+  timezone          String    @default("UTC")
+  locale            String    @default("en")
+  
+  // Preferences (encrypted in production)
+  personalityData   Json?     // Encrypted
+  behaviorPatterns  Json?     // Encrypted
+  preferences       Json      @default("{}")
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+// Dream - Core manifestation feature
+model Dream {
+  id                String    @id @default(cuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Content
+  title             String
+  description       String
+  category          String
+  status            DreamStatus @default(ACTIVE)
+  
+  // AI Analysis (anonymized)
+  aiAnalysis        Json?
+  emotionalTone     Json?
+  
+  // Visualization
+  visionBoards      VisionBoard[]
+  images            DreamImage[]
+  
+  // Progress
+  milestones        Milestone[]
+  progressUpdates   ProgressUpdate[]
+  
+  // Privacy
+  visibility        Visibility @default(PRIVATE)
+  shareToken        String?    @unique
+  
+  // Dates
+  targetDate        DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  completedAt       DateTime?
+  
+  @@index([userId, status])
+  @@index([category])
+}
+
+// Vision Board - Visual manifestation
+model VisionBoard {
+  id                String    @id @default(cuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dreamId           String?
+  dream             Dream?    @relation(fields: [dreamId], references: [id], onDelete: SetNull)
+  
+  // Content
+  title             String
+  description       String?
+  layout            Json
+  elements          Json
+  theme             String    @default("default")
+  
+  // Customization
+  backgroundColor   String?
+  customStyles      Json?
+  
+  // Privacy
+  visibility        Visibility @default(PRIVATE)
+  shareToken        String?    @unique
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  @@index([userId])
+  @@index([dreamId])
+}
+
+// Journal Entry - Private reflection
+model JournalEntry {
+  id                String    @id @default(cuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Content (encrypted)
+  content           String    // Encrypted in production
+  mood              String?
+  tags              String[]
+  
+  // AI Insights (anonymized)
+  aiInsights        Json?
+  sentimentScore    Float?
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  @@index([userId, createdAt])
+}
+
+// Habit Tracking
+model Habit {
+  id                String    @id @default(cuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  title             String
+  description       String?
+  frequency         HabitFrequency
+  targetCount       Int       @default(1)
+  
+  // Tracking
+  completions       HabitCompletion[]
+  currentStreak     Int       @default(0)
+  longestStreak     Int       @default(0)
+  
+  // Reminders
+  reminderTime      String?   // Time in HH:MM format
+  reminderDays      Int[]     // Days of week (0-6)
+  
+  isActive          Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  @@index([userId, isActive])
+}
+
+// Habit Completion Records
+model HabitCompletion {
+  id                String    @id @default(cuid())
+  habitId           String
+  habit             Habit     @relation(fields: [habitId], references: [id], onDelete: Cascade)
+  
+  completedAt       DateTime  @default(now())
+  notes             String?
+  
+  @@index([habitId, completedAt])
+}
+
+// Affirmations
+model Affirmation {
+  id                String    @id @default(cuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  text              String
+  category          String?
+  
+  // Usage tracking
+  useCount          Int       @default(0)
+  lastUsedAt        DateTime?
+  isFavorite        Boolean   @default(false)
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  @@index([userId, category])
+}
+
+// Milestones
+model Milestone {
+  id                String    @id @default(cuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dreamId           String?
+  dream             Dream?    @relation(fields: [dreamId], references: [id], onDelete: SetNull)
+  
+  title             String
+  description       String?
+  targetDate        DateTime?
+  completedAt       DateTime?
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  @@index([userId, dreamId])
+}
+
+// Progress Updates
+model ProgressUpdate {
+  id                String    @id @default(cuid())
+  dreamId           String
+  dream             Dream     @relation(fields: [dreamId], references: [id], onDelete: Cascade)
+  
+  content           String
+  progressPercentage Int?
+  
+  createdAt         DateTime  @default(now())
+  
+  @@index([dreamId, createdAt])
+}
+
+// Dream Images
+model DreamImage {
+  id                String    @id @default(cuid())
+  dreamId           String
+  dream             Dream     @relation(fields: [dreamId], references: [id], onDelete: Cascade)
+  
+  url               String
+  caption           String?
+  source            String?   // 'upload', 'unsplash', 'pexels', etc.
+  
+  createdAt         DateTime  @default(now())
+  
+  @@index([dreamId])
+}
+
+// AI Conversation - Anonymized chat history
+model AIConversation {
+  id                String    @id @default(cuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Anonymized session ID
+  sessionId         String
+  
+  // Context
+  context           String?   // dream, journal, coaching, etc.
+  contextId         String?   // Reference to specific dream/journal/etc.
+  
+  // Messages (encrypted)
+  messages          Json      // Array of messages
+  
+  // Safety
+  flaggedContent    Boolean   @default(false)
+  safetyScore       Float?
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  @@index([userId, sessionId])
+  @@index([context, contextId])
+}
+
+// User Analytics - Aggregated and anonymized
+model UserAnalytics {
+  id                String    @id @default(cuid())
+  userId            String    @unique
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Engagement metrics (anonymized)
+  totalDreams       Int       @default(0)
+  completedDreams   Int       @default(0)
+  activeStreak      Int       @default(0)
+  totalMilestones   Int       @default(0)
+  
+  // Feature usage (anonymized)
+  featureUsage      Json      @default("{}")
+  
+  // Timestamps
+  lastCalculatedAt  DateTime  @default(now())
+  
+  @@index([userId])
+}
+
+// Privacy & Compliance Models
+
+// Consent Management
+model Consent {
+  id                String    @id @default(cuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  type              ConsentType
+  version           String
+  granted           Boolean
+  
+  // IP and user agent for compliance
+  ipAddress         String?
+  userAgent         String?
+  
+  grantedAt         DateTime  @default(now())
+  revokedAt         DateTime?
+  
+  @@index([userId, type])
+}
+
+// Data Export Logs
+model DataExportLog {
+  id                String    @id @default(cuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  requestedAt       DateTime  @default(now())
+  completedAt       DateTime?
+  expiresAt         DateTime
+  
+  // Export details
+  format            String    // json, csv, etc.
+  downloadUrl       String?   // Temporary signed URL
+  
+  @@index([userId, requestedAt])
+}
+
+// Deletion Requests
+model DeletionRequest {
+  id                String    @id @default(cuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  requestedAt       DateTime  @default(now())
+  scheduledFor      DateTime  // 30 days from request
+  completedAt       DateTime?
+  
+  reason            String?
+  
+  @@index([userId, scheduledFor])
+}
+
+// Enums
+
+enum DreamStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  ARCHIVED
+}
+
+enum Visibility {
+  PRIVATE
+  SHARED
+  PUBLIC
+}
+
+enum HabitFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+  CUSTOM
+}
+
+enum ConsentType {
+  TERMS_OF_SERVICE
+  PRIVACY_POLICY
+  MARKETING_EMAILS
+  DATA_PROCESSING
+  AI_ANALYSIS
+  THIRD_PARTY_SHARING
+}
