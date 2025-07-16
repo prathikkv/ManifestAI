@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
+import { ClerkProvider } from "@clerk/nextjs";
 import "./globals.css";
 import PWARegistration from "@/components/PWARegistration";
 
@@ -142,12 +143,14 @@ export default function RootLayout({
         <meta name="format-detection" content="telephone=no" />
       </head>
       <body className={inter.className}>
-        <div className="min-h-screen bg-background text-foreground antialiased">
-          {children}
-        </div>
-        
-        {/* PWA Service Worker Registration */}
-        <PWARegistration />
+        <ClerkProvider>
+          <div className="min-h-screen bg-background text-foreground antialiased">
+            {children}
+          </div>
+          
+          {/* PWA Service Worker Registration */}
+          <PWARegistration />
+        </ClerkProvider>
       </body>
     </html>
   );
