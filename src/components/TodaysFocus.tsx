@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
+import { taskManager, Task, TaskStats } from '@/lib/taskManager';
 import {
   CheckCircle2,
   Circle,
@@ -21,80 +22,64 @@ import {
   Keyboard
 } from 'lucide-react';
 
-interface Task {
-  id: string;
-  title: string;
-  category: 'habit' | 'dream' | 'daily';
-  completed: boolean;
-  priority: 'high' | 'medium' | 'low';
-  timeEstimate?: string;
-}
-
-interface TodayData {
-  tasks: Task[];
-  streak: number;
-  completedToday: number;
-  totalToday: number;
-}
-
 export default function TodaysFocus() {
   const { user } = useUser();
   const router = useRouter();
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [newTaskText, setNewTaskText] = useState('');
   const [isListening, setIsListening] = useState(false);
-  const [todayData, setTodayData] = useState<TodayData>({
-    tasks: [
-      {
-        id: '1',
-        title: 'Review 3 goals for the week',
-        category: 'dream',
-        completed: false,
-        priority: 'high',
-        timeEstimate: '5 min'
-      },
-      {
-        id: '2', 
-        title: 'Take 5 deep breaths',
-        category: 'habit',
-        completed: true,
-        priority: 'medium',
-        timeEstimate: '2 min'
-      },
-      {
-        id: '3',
-        title: 'Send one important email',
-        category: 'daily',
-        completed: false,
-        priority: 'high',
-        timeEstimate: '10 min'
-      },
-      {
-        id: '4',
-        title: 'Write 3 things I\'m grateful for',
-        category: 'habit',
-        completed: false,
-        priority: 'medium',
-        timeEstimate: '3 min'
-      }
-    ],
-    streak: 7,
-    completedToday: 1,
-    totalToday: 4
-  });
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [stats, setStats] = useState<TaskStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const toggleTask = (taskId: string) => {
-    setTodayData(prev => ({
-      ...prev,
-      tasks: prev.tasks.map(task => 
-        task.id === taskId 
-          ? { ...task, completed: !task.completed }
-          : task
-      ),
-      completedToday: prev.tasks.filter(t => 
-        t.id === taskId ? !t.completed : t.completed
-      ).length
-    }));
+  // Load tasks and stats on component mount
+  useEffect(() => {
+    loadTasksAndStats();
+  }, []);
+
+  const loadTasksAndStats = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const [allTasks, taskStats] = await Promise.all([
+        taskManager.getAllTasks(),
+        taskManager.getTaskStats()
+      ]);
+      
+      setTasks(allTasks);
+      setStats(taskStats);
+    } catch (error) {
+      console.error('Error loading tasks:', error);
+      setError('Failed to load tasks. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleTask = async (taskId: string) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    try {
+      // Update task completion status
+      const updatedTask = await taskManager.updateTask(taskId, {
+        completed: !task.completed
+      });
+      
+      if (updatedTask) {
+        // Update local state
+        setTasks(prev => prev.map(t => 
+          t.id === taskId ? updatedTask : t
+        ));
+        
+        // Refresh stats
+        const newStats = await taskManager.getTaskStats();
+        setStats(newStats);
+      }
+    } catch (error) {
+      console.error('Error toggling task:', error);
+    }
     
     // Add haptic feedback if available
     if ('vibrate' in navigator) {
@@ -102,30 +87,34 @@ export default function TodaysFocus() {
     }
   };
 
-  const addQuickTask = () => {
+  const addQuickTask = async () => {
     if (!newTaskText.trim()) return;
     
-    const newTask: Task = {
-      id: Date.now().toString(),
-      title: newTaskText.trim(),
-      category: 'daily',
-      completed: false,
-      priority: 'medium',
-      timeEstimate: '5 min'
-    };
-    
-    setTodayData(prev => ({
-      ...prev,
-      tasks: [...prev.tasks, newTask],
-      totalToday: prev.totalToday + 1
-    }));
-    
-    setNewTaskText('');
-    setShowQuickAdd(false);
-    
-    // Haptic feedback for successful add
-    if ('vibrate' in navigator) {
-      navigator.vibrate([50, 50, 50]);
+    try {
+      const newTask = await taskManager.createTask({
+        title: newTaskText.trim(),
+        category: 'daily',
+        priority: 'medium',
+        timeEstimate: '5 min',
+        tags: []
+      });
+      
+      // Update local state
+      setTasks(prev => [...prev, newTask]);
+      
+      // Refresh stats
+      const newStats = await taskManager.getTaskStats();
+      setStats(newStats);
+      
+      setNewTaskText('');
+      setShowQuickAdd(false);
+      
+      // Haptic feedback for successful add
+      if ('vibrate' in navigator) {
+        navigator.vibrate([50, 50, 50]);
+      }
+    } catch (error) {
+      console.error('Error creating task:', error);
     }
   };
 
@@ -176,8 +165,44 @@ export default function TodaysFocus() {
   };
 
   const timeContext = getTimeBasedGreeting();
-  const pendingTasks = todayData.tasks.filter(t => !t.completed);
-  const completionRate = Math.round((todayData.completedToday / todayData.totalToday) * 100);
+  const pendingTasks = tasks.filter(t => !t.completed);
+  const completedTasks = tasks.filter(t => t.completed);
+  const completionRate = stats ? Math.round((stats.todayCompleted / Math.max(stats.todayTotal, 1)) * 100) : 0;
+  const streakDays = stats?.streakDays || 0;
+
+  if (loading) {
+    return (
+      <div className="space-y-6 animate-pulse">
+        <div className="bg-gradient-to-r from-primary/10 to-purple-500/10 rounded-2xl p-6">
+          <div className="h-6 bg-secondary/50 rounded w-1/2 mb-2"></div>
+          <div className="h-4 bg-secondary/30 rounded w-1/3"></div>
+        </div>
+        <div className="space-y-3">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="bg-card/50 rounded-xl p-4">
+              <div className="h-4 bg-secondary/50 rounded w-3/4"></div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
+          <p className="text-red-600 mb-4">{error}</p>
+          <button 
+            onClick={loadTasksAndStats}
+            className="bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -195,7 +220,7 @@ export default function TodaysFocus() {
           </div>
           <div className="flex items-center space-x-2">
             <Flame className="w-5 h-5 text-orange-500" />
-            <span className="text-lg font-bold text-foreground">{todayData.streak}</span>
+            <span className="text-lg font-bold text-foreground">{streakDays}</span>
           </div>
         </div>
 
@@ -203,7 +228,7 @@ export default function TodaysFocus() {
         <div className="flex items-center justify-between text-sm">
           <span className="text-muted-foreground">Today's Progress</span>
           <span className="font-semibold text-foreground">
-            {todayData.completedToday}/{todayData.totalToday} completed
+            {stats?.todayCompleted || 0}/{stats?.todayTotal || 0} completed
           </span>
         </div>
         <div className="w-full bg-secondary/50 rounded-full h-2 mt-2">
@@ -276,14 +301,14 @@ export default function TodaysFocus() {
       )}
 
       {/* Completed Tasks */}
-      {todayData.completedToday > 0 && (
+      {completedTasks.length > 0 && (
         <div>
           <h3 className="text-md font-semibold text-foreground mb-3 flex items-center">
             <CheckCircle2 className="w-4 h-4 mr-2 text-green-500" />
-            Completed Today ({todayData.completedToday})
+            Completed Today ({completedTasks.length})
           </h3>
           <div className="space-y-2">
-            {todayData.tasks.filter(t => t.completed).map((task) => (
+            {completedTasks.map((task) => (
               <div
                 key={task.id}
                 className="bg-green-50 border border-green-200 rounded-lg p-3 opacity-75"
@@ -323,7 +348,9 @@ export default function TodaysFocus() {
         <p className="text-sm text-foreground font-medium">
           "Small daily improvements lead to stunning long-term results."
         </p>
-        <p className="text-xs text-muted-foreground mt-1">You're {completionRate}% there today!</p>
+        <p className="text-xs text-muted-foreground mt-1">
+          {completionRate > 0 ? `You're ${completionRate}% there today!` : 'Ready to start your day?'}
+        </p>
       </div>
 
       {/* Quick Add Modal */}
@@ -383,13 +410,13 @@ export default function TodaysFocus() {
               <div className="border-t border-border pt-4">
                 <p className="text-xs text-muted-foreground mb-2">Quick templates:</p>
                 <div className="flex flex-wrap gap-2">
-                  {['Meditate 5 min', 'Call mom', 'Review goals', 'Take a walk'].map((template) => (
+                  {taskManager.getQuickTemplates().slice(0, 4).map((template) => (
                     <button
-                      key={template}
-                      onClick={() => setNewTaskText(template)}
+                      key={template.title}
+                      onClick={() => setNewTaskText(template.title)}
                       className="px-3 py-1 text-xs bg-secondary/50 hover:bg-secondary/80 rounded-full transition-colors"
                     >
-                      {template}
+                      {template.title}
                     </button>
                   ))}
                 </div>
