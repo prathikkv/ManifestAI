@@ -16,7 +16,9 @@ import {
   Zap,
   Coffee,
   Sunset,
-  Moon
+  Moon,
+  Mic,
+  Keyboard
 } from 'lucide-react';
 
 interface Task {
@@ -38,6 +40,9 @@ interface TodayData {
 export default function TodaysFocus() {
   const { user } = useUser();
   const router = useRouter();
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
+  const [newTaskText, setNewTaskText] = useState('');
+  const [isListening, setIsListening] = useState(false);
   const [todayData, setTodayData] = useState<TodayData>({
     tasks: [
       {
@@ -90,6 +95,58 @@ export default function TodaysFocus() {
         t.id === taskId ? !t.completed : t.completed
       ).length
     }));
+    
+    // Add haptic feedback if available
+    if ('vibrate' in navigator) {
+      navigator.vibrate(50);
+    }
+  };
+
+  const addQuickTask = () => {
+    if (!newTaskText.trim()) return;
+    
+    const newTask: Task = {
+      id: Date.now().toString(),
+      title: newTaskText.trim(),
+      category: 'daily',
+      completed: false,
+      priority: 'medium',
+      timeEstimate: '5 min'
+    };
+    
+    setTodayData(prev => ({
+      ...prev,
+      tasks: [...prev.tasks, newTask],
+      totalToday: prev.totalToday + 1
+    }));
+    
+    setNewTaskText('');
+    setShowQuickAdd(false);
+    
+    // Haptic feedback for successful add
+    if ('vibrate' in navigator) {
+      navigator.vibrate([50, 50, 50]);
+    }
+  };
+
+  const startVoiceInput = () => {
+    if ('webkitSpeechRecognition' in window) {
+      const recognition = new (window as any).webkitSpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
+      
+      recognition.onstart = () => setIsListening(true);
+      recognition.onend = () => setIsListening(false);
+      recognition.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        setNewTaskText(transcript);
+      };
+      
+      recognition.start();
+    } else {
+      alert('Voice input not supported in this browser');
+    }
   };
 
   const getTimeBasedGreeting = () => {
@@ -244,8 +301,8 @@ export default function TodaysFocus() {
       {/* Quick Actions for Busy Professionals */}
       <div className="grid grid-cols-2 gap-4">
         <button 
-          onClick={() => router.push('/dreams/new')}
-          className="bg-primary text-primary-foreground p-4 rounded-xl hover:bg-primary/90 transition-colors"
+          onClick={() => setShowQuickAdd(true)}
+          className="bg-primary text-primary-foreground p-4 rounded-xl hover:bg-primary/90 transition-colors active:scale-95"
         >
           <Plus className="w-6 h-6 mx-auto mb-2" />
           <span className="text-sm font-semibold">Quick Add</span>
@@ -253,7 +310,7 @@ export default function TodaysFocus() {
         
         <button 
           onClick={() => router.push('/coach')}
-          className="bg-purple-500 text-white p-4 rounded-xl hover:bg-purple-600 transition-colors"
+          className="bg-purple-500 text-white p-4 rounded-xl hover:bg-purple-600 transition-colors active:scale-95"
         >
           <MessageCircle className="w-6 h-6 mx-auto mb-2" />
           <span className="text-sm font-semibold">AI Coach</span>
@@ -268,6 +325,79 @@ export default function TodaysFocus() {
         </p>
         <p className="text-xs text-muted-foreground mt-1">You're {completionRate}% there today!</p>
       </div>
+
+      {/* Quick Add Modal */}
+      {showQuickAdd && (
+        <div className="fixed inset-0 bg-black/50 flex items-end justify-center z-50 p-4">
+          <div className="bg-card w-full max-w-md rounded-t-2xl p-6 animate-in slide-in-from-bottom duration-300">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-foreground">Quick Add Task</h3>
+              <button 
+                onClick={() => setShowQuickAdd(false)}
+                className="p-2 hover:bg-secondary/50 rounded-lg transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="relative">
+                <input
+                  type="text"
+                  value={newTaskText}
+                  onChange={(e) => setNewTaskText(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && addQuickTask()}
+                  placeholder="What do you want to accomplish?"
+                  className="w-full p-4 bg-background border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
+                  autoFocus
+                />
+              </div>
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={startVoiceInput}
+                  disabled={isListening}
+                  className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border border-border transition-colors ${
+                    isListening 
+                      ? 'bg-red-100 text-red-600 border-red-300' 
+                      : 'bg-background hover:bg-secondary/50'
+                  }`}
+                >
+                  <Mic className={`w-4 h-4 ${isListening ? 'animate-pulse' : ''}`} />
+                  <span className="text-sm font-medium">
+                    {isListening ? 'Listening...' : 'Voice'}
+                  </span>
+                </button>
+                
+                <button
+                  onClick={addQuickTask}
+                  disabled={!newTaskText.trim()}
+                  className="flex-1 bg-primary text-primary-foreground p-3 rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span className="text-sm font-medium">Add Task</span>
+                </button>
+              </div>
+              
+              {/* Quick Templates */}
+              <div className="border-t border-border pt-4">
+                <p className="text-xs text-muted-foreground mb-2">Quick templates:</p>
+                <div className="flex flex-wrap gap-2">
+                  {['Meditate 5 min', 'Call mom', 'Review goals', 'Take a walk'].map((template) => (
+                    <button
+                      key={template}
+                      onClick={() => setNewTaskText(template)}
+                      className="px-3 py-1 text-xs bg-secondary/50 hover:bg-secondary/80 rounded-full transition-colors"
+                    >
+                      {template}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

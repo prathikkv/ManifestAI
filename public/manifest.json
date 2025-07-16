@@ -2,7 +2,7 @@
   "name": "ManifestAI - Manifestation & Habit Tracker",
   "short_name": "ManifestAI",
   "description": "AI-powered manifestation platform for busy professionals. Quick habit tracking, voice journaling, and smart vision boards.",
-  "start_url": "/dashboard",
+  "start_url": "/dashboard?utm_source=pwa",
   "display": "standalone",
   "background_color": "#000000",
   "theme_color": "#3B82F6",

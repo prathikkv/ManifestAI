@@ -1,4 +1,11 @@
+'use client';
+
+import { useState } from 'react';
+import { Menu, X } from 'lucide-react';
+
 export default function LandingPage() {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-secondary/20 to-background">
       {/* Header */}
@@ -9,6 +16,8 @@ export default function LandingPage() {
               <div className="w-8 h-8 manifestation-gradient rounded-full" />
               <span className="text-2xl font-bold text-foreground">ManifestAI</span>
             </div>
+            
+            {/* Desktop Navigation */}
             <div className="hidden md:flex items-center space-x-8">
               <a href="#features" className="text-muted-foreground hover:text-foreground transition-colors">Features</a>
               <a href="#how-it-works" className="text-muted-foreground hover:text-foreground transition-colors">How It Works</a>
@@ -20,7 +29,33 @@ export default function LandingPage() {
                 Get Started Free
               </a>
             </div>
+
+            {/* Mobile Menu Button */}
+            <button 
+              className="md:hidden p-2"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            >
+              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
           </nav>
+
+          {/* Mobile Menu */}
+          {mobileMenuOpen && (
+            <div className="md:hidden mt-4 bg-card/90 backdrop-blur-sm rounded-xl p-4 border border-border">
+              <div className="flex flex-col space-y-4">
+                <a href="#features" className="text-muted-foreground hover:text-foreground transition-colors py-2">Features</a>
+                <a href="#how-it-works" className="text-muted-foreground hover:text-foreground transition-colors py-2">How It Works</a>
+                <div className="border-t border-border pt-4 space-y-3">
+                  <a href="/auth/login" className="block text-center text-muted-foreground hover:text-foreground transition-colors font-medium py-2">
+                    Sign In
+                  </a>
+                  <a href="/auth/signup" className="block bg-primary text-primary-foreground px-6 py-3 rounded-lg hover:bg-primary/90 transition-colors text-center font-semibold">
+                    Get Started Free
+                  </a>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </header>
 
